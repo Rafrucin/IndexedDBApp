@@ -1,0 +1,114 @@
+﻿@page "/movies"
+@page "/"
+@inject IIndexedDbFactory DbFactory
+
+<h3>Movies</h3>
+
+<fieldset>
+    <legend>Add new Movie</legend>
+    <EditForm Model="@model" OnValidSubmit="@SaveNewMovie">
+        <InputText @bind-Value="@model.Title" placeholder="Movie Title" />
+        <button type="submit">Add</button>
+
+        <p><ValidationSummary /></p>
+        <DataAnnotationsValidator />
+    </EditForm>
+</fieldset>
+
+@if (movies != null)
+{
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Id</th>
+                <th>Title</th>
+                <th>Updated</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var movie in movies)
+            {
+                <tr @onclick="@(()=>SelectMovie(movie))" style="cursor:grab">
+                    <td>@movie.Id</td>
+                    <td>@movie.Title</td>
+                    <td>@movie.TimeStamp</td>      
+                    <td><button @onclick="@(() => DeletePerson(movie))">Delete</button></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+
+<EditForm Model="@editModel" OnValidSubmit="@EditMovie">
+    <InputText @bind-Value="editModel.Title"/>
+    <button type="submit">Change</button>
+</EditForm>
+
+
+
+
+@code {
+
+    List<MovieModel> movies;
+    MovieModel model = new MovieModel();
+    MovieModel editModel = new MovieModel();
+
+    void SelectMovie(MovieModel model)
+    {
+        if (editModel.Id!=model.Id)
+        {
+            editModel = model;
+        }
+        else
+        {
+            editModel = new MovieModel();
+        }
+    }
+
+    async Task DeletePerson(MovieModel model)
+    {
+        using var db = await this.DbFactory.Create<MoviesDb>();
+        db.Movies.Remove(model);
+        await db.SaveChanges();
+        editModel = new MovieModel();
+        await OnInitializedAsync();
+    }
+
+    async Task SaveNewMovie()
+    {
+        model.TimeStamp = DateTime.Now;
+        using var db = await this.DbFactory.Create<MoviesDb>();
+        db.Movies.Add(model);
+        await db.SaveChanges();
+
+        // Refresh list and reset the form
+        model = new MovieModel();
+        await OnInitializedAsync();
+    }
+
+    async Task EditMovie()
+    {
+        if (editModel.Id!=0)
+        {
+            using (var db = await this.DbFactory.Create<MoviesDb>())
+            {
+                var editedMovie = db.Movies.Single(x => x.Id == editModel.Id);
+                editedMovie.Title = editModel.Title;
+                editedMovie.TimeStamp = DateTime.Now;
+                await db.SaveChanges();
+            }
+            await OnInitializedAsync();
+        }
+        editModel = new MovieModel();
+    }
+
+
+    protected async override Task OnInitializedAsync()
+    {
+        using var db = await DbFactory.Create<MoviesDb>();
+        movies = db.Movies.ToList();
+    }
+
+}
